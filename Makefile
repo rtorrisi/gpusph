@@ -89,11 +89,15 @@ else
 	TARGET_SFX=
 endif
 
-# on Windows, executables have .exe extension
+# File extensions:
+# - Executables have .exe extension on Windows
+# - Object file is .obj on MSVC and .o on gcc
 ifeq ($(wsl), 1)
 	EXE_SFX=.exe
+	OBJ_EXT=.obj
 else
 	EXE_SFX=
+	OBJ_EXT=.o
 endif
 
 # directories: binary, objects, sources, expanded sources
@@ -156,9 +160,9 @@ PROBLEM_EXES = $(foreach p, $(PROBLEM_LIST),$(call dbgexe,$p) $(CURDIR)/$(call d
 problem_src = $(foreach adir, $(PROBLEM_DIRS), $(filter \
 		$(adir)/$(1).cu, \
 		$(wildcard $(adir)/*)))
-problem_obj = $(patsubst $(SRCDIR)/%.cu,$(OBJDIR)/%.o,$(call problem_src,$1))
+problem_obj = $(patsubst $(SRCDIR)/%.cu,$(OBJDIR)/%$(OBJ_EXT),$(call problem_src,$1))
 problem_gen = $(OPTSDIR)/$(1).gen.cc
-problem_gen_obj = $(OBJDIR)/$(1).gen.o
+problem_gen_obj = $(OBJDIR)/$(1).gen$(OBJ_EXT)
 
 problem_objs = $(call problem_obj,$1) $(call problem_gen_obj,$1)
 
@@ -186,9 +190,9 @@ CUDEPS = $(patsubst $(SRCDIR)/%.cu,$(DEPDIR)/%.d,$(CUFILES))
 HEADERS = $(foreach adir, $(SRCDIR) $(SRCSUBS),$(wildcard $(adir)/*.h))
 
 # object files via filename replacement
-MPICXXOBJS = $(patsubst %.cc,$(OBJDIR)/%.o,$(notdir $(MPICXXFILES)))
-CCOBJS = $(patsubst $(SRCDIR)/%.cc,$(OBJDIR)/%.o,$(CCFILES))
-CUOBJS = $(patsubst $(SRCDIR)/%.cu,$(OBJDIR)/%.o,$(CUFILES))
+MPICXXOBJS = $(patsubst %.cc,$(OBJDIR)/%$(OBJ_EXT),$(notdir $(MPICXXFILES)))
+CCOBJS = $(patsubst $(SRCDIR)/%.cc,$(OBJDIR)/%$(OBJ_EXT),$(CCFILES))
+CUOBJS = $(patsubst $(SRCDIR)/%.cu,$(OBJDIR)/%$(OBJ_EXT),$(CUFILES))
 GENOBJS = $(foreach p,$(PROBLEM_LIST),$(call problem_gen_obj,$p))
 
 OBJS = $(CCOBJS) $(MPICXXOBJS)
@@ -989,15 +993,15 @@ $(SRCDIR)/describe-debugflags.h: $(SCRIPTSDIR)/describe-debugflags.awk $(SRCDIR)
 # The -MM flag is used to not include system includes.
 # The -MG flag is used to add missing includes (useful to depend on the .opt files).
 # The -MT flag is used to define the object file.
-$(CCOBJS): $(OBJDIR)/%.o: $(SRCDIR)/%.cc $(DEPDIR)/%.d | $(OBJSUBS)
+$(CCOBJS): $(OBJDIR)/%$(OBJ_EXT): $(SRCDIR)/%.cc $(DEPDIR)/%.d | $(OBJSUBS)
 	$(call show_stage,CC,$(@F))
 	$(CMDECHO)$(CXX) $(CC_INCPATH) $(CPPFLAGS) $(CXXFLAGS) -MG -MM -MT $@ $< > $(word 2,$^)
 	$(CMDECHO)$(CXX) $(CC_INCPATH) $(CPPFLAGS) $(CXXFLAGS) $(OBJ_OUT)$@ $<
-$(GENOBJS): $(OBJDIR)/%.gen.o: $(OPTSDIR)/%.gen.cc $(DEPDIR)/%.gen.d | $(OBJSUBS)
+$(GENOBJS): $(OBJDIR)/%.gen$(OBJ_EXT): $(OPTSDIR)/%.gen.cc $(DEPDIR)/%.gen.d | $(OBJSUBS)
 	$(call show_stage,CC,$(@F))
 	$(CMDECHO)$(CXX) $(CC_INCPATH) $(CPPFLAGS) $(CXXFLAGS) -MG -MM -MT $@ $< > $(word 2,$^)
 	$(CMDECHO)$(CXX) $(CC_INCPATH) $(CPPFLAGS) $(CXXFLAGS) $(OBJ_OUT)$@ $<
-$(MPICXXOBJS): $(OBJDIR)/%.o: $(SRCDIR)/%.cc $(DEPDIR)/%.d | $(OBJSUBS)
+$(MPICXXOBJS): $(OBJDIR)/%$(OBJ_EXT): $(SRCDIR)/%.cc $(DEPDIR)/%.d | $(OBJSUBS)
 	$(call show_stage,MPI,$(@F))
 	$(CMDECHO)OMPI_CXX=$(CXX) MPICH_CXX=$(CXX) \
 		$(MPICXX) $(CC_INCPATH) $(CPPFLAGS) $(CXXFLAGS) -MG -MM -MT $@ $< > $(word 2,$^)
@@ -1005,12 +1009,12 @@ $(MPICXXOBJS): $(OBJDIR)/%.o: $(SRCDIR)/%.cc $(DEPDIR)/%.d | $(OBJSUBS)
 		$(MPICXX) $(CC_INCPATH) $(CPPFLAGS) $(CXXFLAGS) $(OBJ_OUT)$@ $<
 
 # compile GPU objects
-$(CUOBJS): $(OBJDIR)/%.o: $(SRCDIR)/%.cu $(DEPDIR)/%.d | $(OBJSUBS)
+$(CUOBJS): $(OBJDIR)/%$(OBJ_EXT): $(SRCDIR)/%.cu $(DEPDIR)/%.d | $(OBJSUBS)
 	$(call show_stage,CU,$(@F))
 	$(CMDECHO)$(NVCC) $(CPPFLAGS) $(CUFLAGS) -E $< \
 		 --compiler-options -MG,-MM,-MT,$@ > $(word 2,$^)
 	$(CMDECHO)$(NVCC) $(CPPFLAGS) $(CUFLAGS) -c -o $@ $<
-$(OBJDIR)/cuda/%.o: $(SRCDIR)/cuda/%.cu $(COMPUTE_SELECT_OPTFILE) $(FASTMATH_SELECT_OPTFILE) $(CHRONO_SELECT_OPTFILE) | $(OBJSUBS)
+$(OBJDIR)/cuda/%$(OBJ_EXT): $(SRCDIR)/cuda/%.cu $(COMPUTE_SELECT_OPTFILE) $(FASTMATH_SELECT_OPTFILE) $(CHRONO_SELECT_OPTFILE) | $(OBJSUBS)
 
 # deps: empty rule, but require the directories and optfiles to be present
 $(CCDEPS): | $(DEPSUBS) $(OPTFILES) ;
@@ -1068,7 +1072,7 @@ cookiesclean:
 
 # target: genclean - Clean all problem generators
 genclean:
-	$(RM) $(OBJDIR)/*.gen.o $(OPTSDIR)/*.gen.cc
+	$(RM) $(OBJDIR)/*.gen$(OBJ_EXT) $(OPTSDIR)/*.gen.cc
 
 # target: confclean - Clean all configuration options: like cookiesclean, but also purges Makefile.conf
 confclean: cookiesclean
