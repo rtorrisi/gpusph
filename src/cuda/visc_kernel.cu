@@ -269,7 +269,7 @@ horner_one_minus_exp_minus_over<1>(float x)
 
 template<typename KP>
 __device__ __forceinline__
-enable_if_t< yield_strength_type<KP::rheologytype>() == NO_YS, float >
+enable_if_t< yield_strength_type<KP::rheologytype>::value == NO_YS, float >
 viscYieldTerm(int fluid, float shrate, KP const& params)
 {
 	return 0.0f;
@@ -280,7 +280,7 @@ viscYieldTerm(int fluid, float shrate, KP const& params)
  */
 template<typename KP>
 __device__ __forceinline__
-enable_if_t< yield_strength_type<KP::rheologytype>() == STD_YS, float>
+enable_if_t< yield_strength_type<KP::rheologytype>::value == STD_YS, float>
 viscYieldTerm(int fluid, float shrate, KP const& params)
 {
 	return d_yield_strength[fluid]/shrate;
@@ -293,7 +293,7 @@ viscYieldTerm(int fluid, float shrate, KP const& params)
  */
 template<typename KP>
 __device__ __forceinline__
-enable_if_t< yield_strength_type<KP::rheologytype>() == REG_YS, float >
+enable_if_t< yield_strength_type<KP::rheologytype>::value == REG_YS, float >
 viscYieldTerm(int fluid, float shrate, KP const& params)
 {
 	const float m = d_visc_regularization_param[fluid];
